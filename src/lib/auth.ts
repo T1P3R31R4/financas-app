@@ -1,0 +1,86 @@
+import { NextAuthOptions } from 'next-auth'
+import GoogleProvider from 'next-auth/providers/google'
+import { PrismaAdapter } from '@auth/prisma-adapter'
+import { prisma } from '@/lib/prisma'
+import { Role } from '@prisma/client'
+
+export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(prisma) as any,
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID ?? '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+      allowDangerousEmailAccountLinking: true,
+    }),
+  ],
+  session: {
+    strategy: 'jwt',
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+        token.role = (user as any).role || Role.USER
+        token.familyId = (user as any).familyId || null
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (session.user && token) {
+        (session.user as any).id = token.id;
+        (session.user as any).role = token.role || Role.USER;
+        (session.user as any).familyId = token.familyId || null;
+      }
+      return session
+    },
+  },
+  events: {
+    // Quando uma nova conta é criada via Google Social Login,
+    // criamos automaticamente um Workspace / Family para ela caso não possua
+    async createUser({ user }) {
+      try {
+        const familyName = user.name ? `Família de ${user.name}` : 'Minha Família'
+        const newFamily = await prisma.family.create({
+          data: { name: familyName },
+        })
+
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { familyId: newFamily.id },
+        })
+
+        // Telemetria / Auditoria do Registro
+        await prisma.activityLog.create({
+          data: {
+            action: 'REGISTER_OAUTH',
+            entity: 'USER',
+            userId: user.id,
+            familyId: newFamily.id,
+            metadata: {
+              email: user.email,
+              provider: 'google',
+              note: 'Novo workspace multi-tenant gerado automaticamente via Google Login',
+            },
+          },
+        })
+      } catch (err) {
+        console.error('Erro ao provisionar família para novo usuário:', err)
+      }
+    },
+    async signIn({ user }) {
+      if (user?.id) {
+        await prisma.activityLog.create({
+          data: {
+            action: 'LOGIN',
+            entity: 'AUTH',
+            userId: user.id,
+            metadata: { email: user.email, provider: 'google' },
+          },
+        }).catch(() => {})
+      }
+    },
+  },
+  pages: {
+    signIn: '/',
+  },
+}
