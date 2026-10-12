@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useState, useEffect } from 'react'
+import { Suspense, useState, useEffect, useMemo } from 'react'
 import { signIn, useSession } from 'next-auth/react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -23,20 +23,22 @@ function LoginForm() {
   const [loading, setLoading] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
 
+  // Minimal type for the authenticated session user used here
+  type SessionUser = { role?: string }
+
   // Redirect se já autenticado
   useEffect(() => {
     if (status === 'authenticated' && session?.user) {
-      const role = (session.user as any).role
+      const role = (session.user as SessionUser).role
       router.replace(role === 'ADMIN' ? '/admin' : '/')
     }
   }, [status, session, router])
 
-  useEffect(() => {
-    if (errorParam === 'CredentialsSignin') {
-      setErrorMsg('E-mail ou senha incorretos. Verifique e tente novamente.')
-    } else if (errorParam === 'ForbiddenAdminOnly') {
-      setErrorMsg('Acesso restrito. Necessário perfil de Administrador.')
-    }
+  // Derive error message from query param (avoid calling setState synchronously in effect)
+  const errorMessageFromParam = useMemo(() => {
+    if (errorParam === 'CredentialsSignin') return 'E-mail ou senha incorretos. Verifique e tente novamente.'
+    if (errorParam === 'ForbiddenAdminOnly') return 'Acesso restrito. Necessário perfil de Administrador.'
+    return ''
   }, [errorParam])
 
 
@@ -81,10 +83,10 @@ function LoginForm() {
       </CardHeader>
 
       <CardContent className="space-y-5">
-        {errorMsg && (
+        {(errorMsg || errorMessageFromParam) && (
           <div className="p-3 text-xs bg-red-500/15 border border-red-500/30 text-red-400 rounded-md flex items-start gap-2">
             <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            <span>{errorMsg}</span>
+            <span>{errorMsg || errorMessageFromParam}</span>
           </div>
         )}
 

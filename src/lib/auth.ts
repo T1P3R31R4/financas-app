@@ -5,10 +5,21 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import { compare } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { Role } from '@prisma/client'
+import type { Adapter } from 'next-auth/adapters'
+
+// Small typed shape used locally to avoid `any` casts
+type AuthUser = {
+  id: string
+  name?: string | null
+  email?: string | null
+  image?: string | null
+  role?: Role
+  familyId?: string | null
+}
 
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(prisma) as any,
+  adapter: PrismaAdapter(prisma) as unknown as Adapter,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID ?? '',
@@ -65,7 +76,7 @@ export const authOptions: NextAuthOptions = {
           image: user.image,
           role: user.role,
           familyId: user.familyId,
-        } as any
+        } as unknown as AuthUser
       },
     }),
   ],
@@ -75,17 +86,19 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-        token.role = (user as any).role || Role.USER
-        token.familyId = (user as any).familyId || null
+        const u = user as AuthUser
+        token.id = u.id
+        token.role = u.role || Role.USER
+        token.familyId = u.familyId || null
       }
       return token
     },
     async session({ session, token }) {
       if (session.user && token) {
-        (session.user as any).id = token.id
-        ;(session.user as any).role = token.role || Role.USER
-        ;(session.user as any).familyId = token.familyId || null
+        const su = session.user as AuthUser
+        su.id = token.id as string
+        su.role = (token.role as Role) || Role.USER
+        su.familyId = token.familyId || null
       }
       return session
     },
