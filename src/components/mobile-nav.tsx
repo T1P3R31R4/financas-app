@@ -3,20 +3,34 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Home, List, Briefcase, Users, ShieldCheck, Menu, X } from 'lucide-react'
+import { useSession, signOut } from 'next-auth/react'
+import { Home, List, Briefcase, FileText, Settings, ShieldCheck, Menu, X, LogOut } from 'lucide-react'
 import { navItems } from '@/components/sidebar'
 import { cn } from '@/lib/utils'
 
 export function MobileNav() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const { data: session } = useSession()
+
+  const userRole = (session?.user as any)?.role || 'USER'
+  const userName = session?.user?.name || 'Família'
+  const userEmail = session?.user?.email || 'portal@financascasa.com'
 
   const bottomItems = [
     { href: '/', label: 'Início', icon: Home },
     { href: '/lancamentos', label: 'Lançamentos', icon: List },
     { href: '/renda-variavel', label: 'Renda Var.', icon: Briefcase },
-    { href: '/membros', label: 'Membros', icon: Users },
+    { href: '/relatorios', label: 'Relatórios', icon: FileText },
+    { href: '/configuracoes', label: 'Ajustes', icon: Settings },
   ]
+
+  const visibleNavItems = navItems.filter(item => {
+    if (item.adminOnly) {
+      return userRole === 'ADMIN'
+    }
+    return true
+  })
 
   return (
     <>
@@ -26,18 +40,25 @@ export function MobileNav() {
           <span className="text-xl font-bold bg-gradient-to-r from-primary to-indigo-400 bg-clip-text text-transparent">
             FinancasCasa
           </span>
-          <span className="text-[10px] bg-primary/10 text-primary px-1 py-0.5 rounded font-mono">
+          <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-mono font-medium">
             SaaS
           </span>
+          {userRole === 'ADMIN' && (
+            <span className="text-[10px] bg-indigo-500/15 text-indigo-400 px-1.5 py-0.5 rounded font-semibold border border-indigo-500/20">
+              Admin
+            </span>
+          )}
         </div>
 
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="p-2 rounded-md hover:bg-accent text-foreground transition-colors"
-          aria-label="Abrir menu"
-        >
-          {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsOpen(!isOpen)}
+            className="p-2 rounded-md hover:bg-accent text-foreground transition-colors"
+            aria-label="Abrir menu"
+          >
+            {isOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </header>
 
       {/* Drawer / Sheet Overlay */}
@@ -47,7 +68,7 @@ export function MobileNav() {
           onClick={() => setIsOpen(false)}
         >
           <div
-            className="fixed inset-y-0 left-0 w-3/4 max-w-xs bg-card border-r border-border p-6 shadow-xl flex flex-col justify-between"
+            className="fixed inset-y-0 left-0 w-4/5 max-w-xs bg-card border-r border-border p-6 shadow-xl flex flex-col justify-between"
             onClick={e => e.stopPropagation()}
           >
             <div>
@@ -67,7 +88,7 @@ export function MobileNav() {
               </div>
 
               <nav className="mt-6 space-y-1.5">
-                {navItems.map(({ href, label, icon: Icon, highlight, adminOnly }) => {
+                {visibleNavItems.map(({ href, label, icon: Icon, highlight, adminOnly }) => {
                   const isActive = pathname === href
                   return (
                     <Link
@@ -96,16 +117,45 @@ export function MobileNav() {
               </nav>
             </div>
 
-            <div className="pt-4 border-t border-border text-xs text-muted-foreground flex items-center justify-between">
-              <span>Modo Responsivo</span>
-              <span className="font-mono text-primary">Mobile OK</span>
+            {/* Footer com Usuário e Logout */}
+            <div className="pt-4 border-t border-border space-y-3">
+              <div className="flex items-center justify-between">
+                <Link
+                  href="/configuracoes"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center gap-2.5 min-w-0"
+                >
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-indigo-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                    {userName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold truncate text-foreground">
+                      {userName}
+                    </p>
+                    <p className="text-[10px] text-muted-foreground truncate">{userEmail}</p>
+                  </div>
+                </Link>
+
+                <button
+                  onClick={() => signOut({ callbackUrl: '/login' })}
+                  title="Sair da Conta"
+                  className="p-1.5 rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-400 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="text-[10px] text-muted-foreground flex items-center justify-between pt-1">
+                <span>FinancasCasa Mobile</span>
+                <span className="font-mono text-primary">v2.5 SaaS</span>
+              </div>
             </div>
           </div>
         </div>
       )}
 
       {/* Bottom Navigation Bar para Acesso Rápido com Polegar no Mobile */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border flex items-center justify-around py-1.5 px-2">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t border-border flex items-center justify-around py-1.5 px-1 pb-safe">
         {bottomItems.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href
           return (
@@ -113,7 +163,7 @@ export function MobileNav() {
               key={href}
               href={href}
               className={cn(
-                'flex flex-col items-center justify-center py-1 px-3 rounded-md transition-colors text-[10px] font-medium gap-0.5',
+                'flex flex-col items-center justify-center py-1 px-2.5 rounded-md transition-colors text-[10px] font-medium gap-0.5',
                 isActive
                   ? 'text-primary font-semibold'
                   : 'text-muted-foreground hover:text-foreground'
@@ -124,18 +174,21 @@ export function MobileNav() {
             </Link>
           )
         })}
-        <Link
-          href="/admin"
-          className={cn(
-            'flex flex-col items-center justify-center py-1 px-3 rounded-md transition-colors text-[10px] font-medium gap-0.5',
-            pathname === '/admin'
-              ? 'text-indigo-400 font-semibold'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          <ShieldCheck className="w-4 h-4" />
-          <span>Admin</span>
-        </Link>
+
+        {userRole === 'ADMIN' && (
+          <Link
+            href="/admin"
+            className={cn(
+              'flex flex-col items-center justify-center py-1 px-2 rounded-md transition-colors text-[10px] font-medium gap-0.5',
+              pathname.startsWith('/admin')
+                ? 'text-indigo-400 font-semibold'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Admin</span>
+          </Link>
+        )}
       </nav>
     </>
   )

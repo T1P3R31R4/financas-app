@@ -30,8 +30,12 @@ export async function PUT(
     const body = await req.json()
     const {
       description, amount, date, dueDate, type, isFixed, status,
-      isHouseholdExpense, notes, memberId, categoryId
+      isHouseholdExpense, notes, memberId, categoryId,
+      receiptUrl, audioNote, tags
     } = body
+
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || '127.0.0.1'
+    const userAgent = req.headers.get('user-agent') || 'Browser'
 
     const transaction = await prisma.transaction.update({
       where: { id },
@@ -45,18 +49,23 @@ export async function PUT(
         status: status as StatusType | undefined,
         isHouseholdExpense: isHouseholdExpense ?? undefined,
         notes: notes ?? null,
+        receiptUrl: receiptUrl !== undefined ? receiptUrl : undefined,
+        audioNote: audioNote !== undefined ? audioNote : undefined,
+        tags: Array.isArray(tags) ? tags : undefined,
         memberId: memberId || undefined,
         categoryId: categoryId || undefined,
       },
       include: { member: true, category: true }
     })
 
-    // Telemetria / Auditoria (ActivityLog)
+    // Telemetria / Auditoria (ActivityLog com IP e UserAgent)
     await prisma.activityLog.create({
       data: {
         action: 'UPDATE',
         entity: 'TRANSACTION',
         familyId: transaction.familyId,
+        ip,
+        userAgent,
         metadata: {
           transactionId: transaction.id,
           description: transaction.description,

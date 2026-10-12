@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -41,7 +41,13 @@ model User {
   email         String?       @unique
   emailVerified DateTime?
   image         String?
+  password      String?       // Hash bcryptjs (null para usuários OAuth)
   role          Role          @default(USER)
+
+  // Perfil estendido
+  phone         String?
+  timezone      String?       @default("America/Sao_Paulo")
+  currency      String?       @default("BRL")
 
   familyId      String?
   family        Family?       @relation(fields: [familyId], references: [id], onDelete: SetNull)
@@ -53,6 +59,7 @@ model User {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 }
+
 
 model Account {
   id                String  @id @default(uuid())
@@ -165,6 +172,11 @@ model Transaction {
   isHouseholdExpense Boolean         @default(true)
   notes              String?         @db.Text
   
+  // Novos campos profissionais
+  receiptUrl         String?         // URL do comprovante (Storage / Upload)
+  audioNote          String?         @db.Text // Transcrição de áudio via Speech-to-Text
+  tags               String[]        @default([]) // Tags para filtros avançados
+
   memberId           String
   member             Member          @relation(fields: [memberId], references: [id], onDelete: Cascade)
   
@@ -183,12 +195,16 @@ model Transaction {
 // ====================================================
 model ActivityLog {
   id        String   @id @default(uuid())
-  action    String   // Ex: "CREATE", "UPDATE", "DELETE", "LOGIN", "SECURITY_ALERT"
+  action    String   // Ex: "CREATE", "UPDATE", "DELETE", "LOGIN", "EXPORT", "BACKUP"
   entity    String   // Ex: "TRANSACTION", "MEMBER", "USER", "FAMILY"
   userId    String?
   user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
   familyId  String?
   family    Family?  @relation(fields: [familyId], references: [id], onDelete: Cascade)
-  metadata  Json?    // Dados adicionais, IP, detalhes do erro ou alterações
+  
+  ip        String?  // Endereço IP do cliente
+  userAgent String?  // Navegador / Dispositivo
+  metadata  Json?    // Detalhes da mutação, parâmetros, etc.
+  
   createdAt DateTime @default(now())
 }

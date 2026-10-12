@@ -49,7 +49,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const {
       description, amount, date, dueDate, type, isFixed, status,
-      isHouseholdExpense, notes, memberId, categoryId, familyId
+      isHouseholdExpense, notes, memberId, categoryId, familyId,
+      receiptUrl, audioNote, tags
     } = body
 
     if (!description || !amount || !date || !memberId || !categoryId) {
@@ -58,6 +59,9 @@ export async function POST(req: NextRequest) {
 
     const member = await prisma.member.findUnique({ where: { id: memberId } })
     const effectiveFamilyId = familyId || member?.familyId || (await getOrCreateDefaultFamilyId())
+
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || '127.0.0.1'
+    const userAgent = req.headers.get('user-agent') || 'Browser'
 
     const transaction = await prisma.transaction.create({
       data: {
@@ -70,6 +74,9 @@ export async function POST(req: NextRequest) {
         status: (status as StatusType) || StatusType.PENDING,
         isHouseholdExpense: isHouseholdExpense ?? true,
         notes: notes || null,
+        receiptUrl: receiptUrl || null,
+        audioNote: audioNote || null,
+        tags: Array.isArray(tags) ? tags : [],
         memberId,
         categoryId,
         familyId: effectiveFamilyId,
@@ -77,17 +84,21 @@ export async function POST(req: NextRequest) {
       include: { member: true, category: true }
     })
 
-    // Telemetria / Auditoria (ActivityLog)
+    // Telemetria / Auditoria (ActivityLog com IP e UserAgent)
     await prisma.activityLog.create({
       data: {
         action: 'CREATE',
         entity: 'TRANSACTION',
         familyId: effectiveFamilyId,
+        ip,
+        userAgent,
         metadata: {
           transactionId: transaction.id,
           amount: Number(transaction.amount),
           type: transaction.type,
           description: transaction.description,
+          hasReceipt: !!receiptUrl,
+          hasAudioNote: !!audioNote,
         },
       }
     }).catch(err => console.error('Erro ao gravar log:', err))

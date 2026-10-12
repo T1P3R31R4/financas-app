@@ -16,7 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Search, TrendingUp, TrendingDown, CheckCircle2, Clock, Pencil, Trash2, RefreshCw } from 'lucide-react'
+import { Plus, Search, TrendingUp, TrendingDown, CheckCircle2, Clock, Pencil, Trash2, RefreshCw, Paperclip, Mic } from 'lucide-react'
 
 interface Member { id: string; name: string; color: string | null }
 interface Category { id: string; name: string; type: string }
@@ -31,6 +31,9 @@ interface Transaction {
   status: 'PENDING' | 'PAID'
   isHouseholdExpense: boolean
   notes: string | null
+  receiptUrl: string | null
+  audioNote: string | null
+  tags: string[]
   memberId: string
   categoryId: string
   member: Member
@@ -243,17 +246,47 @@ export function LancamentosClient({ transactions, members, categories }: Lancame
                   </TableCell>
 
                   <TableCell>
-                    <div className="font-medium text-sm">{tx.description}</div>
-                    <div className="flex flex-wrap gap-1 mt-0.5 sm:hidden">
-                      <span className="text-[10px] text-muted-foreground">{tx.category.name}</span>
-                      <span className="text-[10px] text-muted-foreground">• {new Date(tx.date).toLocaleDateString('pt-BR')}</span>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-medium text-sm">{tx.description}</span>
+                      {tx.receiptUrl && (
+                        <a
+                          href={tx.receiptUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Ver Comprovante Anexado"
+                          className="inline-flex items-center gap-0.5 text-[10px] bg-emerald-500/10 text-emerald-400 hover:text-emerald-300 px-1.5 py-0.5 rounded border border-emerald-500/20"
+                        >
+                          <Paperclip className="w-2.5 h-2.5" />
+                          Recibo
+                        </a>
+                      )}
+                      {tx.audioNote && (
+                        <span
+                          title={`Transcrito por voz: "${tx.audioNote}"`}
+                          className="inline-flex items-center gap-0.5 text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded border border-primary/20"
+                        >
+                          <Mic className="w-2.5 h-2.5" />
+                          Voz
+                        </span>
+                      )}
                     </div>
-                    {tx.isFixed && (
-                      <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-sm">Fixo</span>
-                    )}
-                    {tx.isHouseholdExpense && (
-                      <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-sm ml-1">Casa</span>
-                    )}
+                    <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                      {tx.isFixed && (
+                        <span className="text-[10px] text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded-sm">Fixo</span>
+                      )}
+                      {tx.isHouseholdExpense && (
+                        <span className="text-[10px] text-violet-400 bg-violet-500/10 px-1.5 py-0.5 rounded-sm">Casa</span>
+                      )}
+                      {tx.tags && tx.tags.map(t => (
+                        <span key={t} className="text-[10px] text-muted-foreground bg-accent/60 px-1 rounded">
+                          #{t}
+                        </span>
+                      ))}
+                      <div className="flex flex-wrap gap-1 sm:hidden">
+                        <span className="text-[10px] text-muted-foreground">{tx.category.name}</span>
+                        <span className="text-[10px] text-muted-foreground">• {new Date(tx.date).toLocaleDateString('pt-BR')}</span>
+                      </div>
+                    </div>
                   </TableCell>
 
                   <TableCell>
@@ -360,6 +393,9 @@ export function LancamentosClient({ transactions, members, categories }: Lancame
           status: editingTx.status,
           isHouseholdExpense: editingTx.isHouseholdExpense,
           notes: editingTx.notes || '',
+          receiptUrl: editingTx.receiptUrl || '',
+          audioNote: editingTx.audioNote || '',
+          tags: editingTx.tags || [],
           memberId: editingTx.memberId,
           categoryId: editingTx.categoryId,
         } : undefined}
