@@ -98,7 +98,7 @@ export const authOptions: NextAuthOptions = {
         const su = session.user as AuthUser
         su.id = token.id as string
         su.role = (token.role as Role) || Role.USER
-        su.familyId = token.familyId || null
+        su.familyId = (token.familyId as string | null) || null
       }
       return session
     },
