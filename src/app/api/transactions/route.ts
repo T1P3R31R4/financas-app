@@ -1,33 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { TransactionType, StatusType } from '@prisma/client'
 
-async function getOrCreateDefaultFamilyId(): Promise<string> {
-  const existing = await prisma.family.findFirst()
-  if (existing) return existing.id
-  const created = await prisma.family.create({
-    data: { name: 'Família Principal' }
-  })
-  return created.id
-}
-
 export async function GET(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as { familyId?: string } | undefined
+
+    if (!user?.familyId) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    }
+
     const { searchParams } = new URL(req.url)
     const memberId = searchParams.get('memberId')
     const categoryId = searchParams.get('categoryId')
-    const familyId = searchParams.get('familyId')
     const type = searchParams.get('type') as TransactionType | null
     const status = searchParams.get('status') as StatusType | null
     const isFixed = searchParams.get('isFixed')
 
-    const where: Record<string, unknown> = {}
+    // Obrigatoriamente filtra sempre pela família do utilizador logado
+    const where: Record<string, unknown> = {
+      familyId: user.familyId,
+    }
+
     if (memberId) where.memberId = memberId
     if (categoryId) where.categoryId = categoryId
-    if (familyId) where.familyId = familyId
     if (type) where.type = type
     if (status) where.status = status
-    if (isFixed !== null) where.isFixed = isFixed === 'true'
+    if (isFixed !== null && isFixed !== undefined) where.isFixed = isFixed === 'true'
 
     const transactions = await prisma.transaction.findMany({
       where,
@@ -37,6 +39,7 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { date: 'desc' }
     })
+
     return NextResponse.json(transactions)
   } catch (error) {
     console.error(error)
@@ -46,10 +49,17 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
+    const user = session?.user as { familyId?: string } | undefined
+
+    if (!user?.familyId) {
+      return NextResponse.json({ error: 'Não autorizado' }, { status: 401 })
+    }
+
     const body = await req.json()
     const {
       description, amount, date, dueDate, type, isFixed, status,
-      isHouseholdExpense, notes, memberId, categoryId, familyId,
+      isHouseholdExpense, notes, memberId, categoryId,
       receiptUrl, audioNote, tags
     } = body
 
@@ -57,12 +67,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 })
     }
 
-    const member = await prisma.member.findUnique({ where: { id: memberId } })
-    const effectiveFamilyId = familyId || member?.familyId || (await getOrCreateDefaultFamilyId())
+    // Valida se o membro pertence à mesma família do utilizador para segurança extra
+    const member = await prisma.member.findFirst({
+      where: { id: memberId, familyId: user.familyId }
+    })
+
+    if (!member) {
+      return NextResponse.json({ error: 'Membro inválido para esta família' }, { status: 400 })
+    }
 
     const ip = req.headers.get('x-forwarded-for')?.split(',')[0] || req.headers.get('x-real-ip') || '127.0.0.1'
     const userAgent = req.headers.get('user-agent') || 'Browser'
 
+    // Utiliza estritamente o familyId da sessão ativa
     const transaction = await prisma.transaction.create({
       data: {
         description,
@@ -79,17 +96,17 @@ export async function POST(req: NextRequest) {
         tags: Array.isArray(tags) ? tags : [],
         memberId,
         categoryId,
-        familyId: effectiveFamilyId,
+        familyId: user.familyId,
       },
       include: { member: true, category: true }
     })
 
-    // Telemetria / Auditoria (ActivityLog com IP e UserAgent)
+    // Telemetria / Auditoria
     await prisma.activityLog.create({
       data: {
         action: 'CREATE',
         entity: 'TRANSACTION',
-        familyId: effectiveFamilyId,
+        familyId: user.familyId,
         ip,
         userAgent,
         metadata: {
