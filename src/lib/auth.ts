@@ -6,11 +6,6 @@ import { compare } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
 import { Role } from '@prisma/client'
 
-// Contas de demonstração (sem senha real necessária)
-const DEMO_ACCOUNTS: Record<string, { role: Role; name: string }> = {
-  'tiago@financascasa.com': { role: Role.USER, name: 'Tiago (Demo)' },
-  'admin@financascasa.com': { role: Role.ADMIN, name: 'Administrador (Demo)' },
-}
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma) as any,
@@ -27,62 +22,12 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Senha', type: 'password' },
-        isDemo: { label: 'Demo', type: 'text' },
       },
+
       async authorize(credentials) {
         if (!credentials?.email) return null
 
         const email = credentials.email.toLowerCase().trim()
-        const isDemo = credentials.isDemo === 'true'
-        const demoConfig = DEMO_ACCOUNTS[email]
-
-        // ── Fluxo de demonstração ─────────────────────────────────────────────
-        if (isDemo && demoConfig) {
-          // Garantir família padrão para demos
-          let family = await prisma.family.findFirst()
-          if (!family) {
-            family = await prisma.family.create({
-              data: { name: 'Família Principal (Casa)' }
-            })
-          }
-
-          // Buscar ou criar usuário demo
-          let user = await prisma.user.findUnique({ where: { email } })
-          if (!user) {
-            user = await prisma.user.create({
-              data: {
-                email,
-                name: demoConfig.name,
-                role: demoConfig.role,
-                familyId: family.id,
-              },
-            })
-          } else if (demoConfig.role === Role.ADMIN && user.role !== Role.ADMIN) {
-            user = await prisma.user.update({
-              where: { id: user.id },
-              data: { role: Role.ADMIN },
-            })
-          }
-
-          await prisma.activityLog.create({
-            data: {
-              action: 'LOGIN_DEMO',
-              entity: 'AUTH',
-              userId: user.id,
-              familyId: user.familyId,
-              metadata: { email, role: user.role, provider: 'demo' },
-            },
-          }).catch(() => {})
-
-          return {
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            image: user.image,
-            role: user.role,
-            familyId: user.familyId,
-          } as any
-        }
 
         // ── Fluxo de Login real (E-mail + Senha) ──────────────────────────────
         const user = await prisma.user.findUnique({ where: { email } })

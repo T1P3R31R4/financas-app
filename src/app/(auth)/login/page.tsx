@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { ShieldCheck, Lock, ArrowRight, Sparkles, Loader2, Mail, Eye, EyeOff } from 'lucide-react'
+import { Lock, ArrowRight, Sparkles, Loader2, Mail, Eye, EyeOff } from 'lucide-react'
 
 function LoginForm() {
   const router = useRouter()
@@ -39,26 +39,6 @@ function LoginForm() {
     }
   }, [errorParam])
 
-  async function handleDemoLogin(demoEmail: string, role: 'ADMIN' | 'USER', redirectPath: string) {
-    setLoading(role)
-    setErrorMsg('')
-    try {
-      const res = await signIn('credentials', {
-        email: demoEmail,
-        password: 'demo',
-        isDemo: 'true',
-        redirect: false,
-      })
-      if (res?.error) {
-        setErrorMsg('Erro ao autenticar. Tente novamente.')
-      } else {
-        router.push(redirectPath)
-        router.refresh()
-      }
-    } finally {
-      setLoading(null)
-    }
-  }
 
   async function handleEmailLogin(e: React.FormEvent) {
     e.preventDefault()
@@ -191,43 +171,6 @@ function LoginForm() {
           </Button>
         </form>
 
-        {/* Demo rápido */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border/60" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-3 text-muted-foreground/70">Acesso de demonstração</span>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={!!loading}
-            onClick={() => handleDemoLogin('tiago@financascasa.com', 'USER', '/')}
-            className="h-auto py-2 px-3 flex flex-col items-start gap-0.5 border border-border/60 hover:border-primary/40 text-left text-xs"
-          >
-            <span className="font-semibold text-foreground">👨‍👩‍👧 Família</span>
-            <span className="text-muted-foreground text-[10px] leading-tight">Portal financeiro</span>
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            disabled={!!loading}
-            onClick={() => handleDemoLogin('admin@financascasa.com', 'ADMIN', '/admin')}
-            className="h-auto py-2 px-3 flex flex-col items-start gap-0.5 border border-indigo-500/30 hover:border-indigo-500/50 text-left text-xs bg-indigo-500/5"
-          >
-            <div className="flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-indigo-400" />
-              <span className="font-semibold text-indigo-400">Admin</span>
-            </div>
-            <span className="text-muted-foreground text-[10px] leading-tight">Painel global</span>
-          </Button>
-        </div>
       </CardContent>
 
       <CardFooter className="pt-0 pb-5 flex flex-col items-center gap-3 border-t border-border/50 mt-2">
