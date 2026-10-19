@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { hash } from 'bcryptjs'
 import { prisma } from '@/lib/prisma'
+import { createDefaultCategories } from '@/lib/defaultCategories'
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,34 +38,38 @@ export async function POST(req: NextRequest) {
     // Hash seguro da senha
     const hashedPassword = await hash(password, 12)
 
-    // Criar Família (Workspace) do novo tenant
+    // Criar Família (Workspace) exclusiva do novo tenant
     const newFamily = await prisma.family.create({
       data: { name: familyName.trim() },
     })
 
-    // Criar usuário vinculado ao workspace
+    // Criar utilizador vinculado exclusivamente ao seu workspace
     const newUser = await prisma.user.create({
       data: {
-        name: name.trim(),
-        email: normalizedEmail,
+        name:     name.trim(),
+        email:    normalizedEmail,
         password: hashedPassword,
         familyId: newFamily.id,
       },
     })
 
+    // Criar categorias padrão (receitas + despesas) para este tenant
+    // Associadas exclusivamente ao familyId do novo utilizador — sem categorias globais
+    await createDefaultCategories(prisma, newFamily.id)
+
     // Registrar auditoria
     await prisma.activityLog.create({
       data: {
-        action: 'REGISTER',
-        entity: 'USER',
-        userId: newUser.id,
+        action:   'REGISTER',
+        entity:   'USER',
+        userId:   newUser.id,
         familyId: newFamily.id,
-        ip: req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? undefined,
+        ip:       req.headers.get('x-forwarded-for') ?? req.headers.get('x-real-ip') ?? undefined,
         userAgent: req.headers.get('user-agent') ?? undefined,
         metadata: {
-          email: normalizedEmail,
+          email:      normalizedEmail,
           familyName: newFamily.name,
-          provider: 'credentials',
+          provider:   'credentials',
         },
       },
     })

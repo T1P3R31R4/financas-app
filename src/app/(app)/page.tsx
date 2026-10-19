@@ -1,28 +1,37 @@
-import { prisma } from "@/lib/prisma"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Wallet, TrendingDown, PiggyBank, CalendarClock, ArrowRight, ShieldCheck } from "lucide-react"
-import { TransactionType, StatusType } from "@prisma/client"
-import Link from "next/link"
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { prisma } from '@/lib/prisma'
+import { redirect } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Wallet, TrendingDown, PiggyBank, CalendarClock, ArrowRight } from 'lucide-react'
+import { TransactionType, StatusType } from '@prisma/client'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
 export default async function Dashboard() {
-  const family = await prisma.family.findFirst({
-    include: {
-      members: true,
-      transactions: {
-        include: { member: true, category: true },
-        orderBy: { date: 'desc' },
-      },
-    },
-  })
+  const session = await getServerSession(authOptions)
+  const user    = session?.user as { familyId?: string; name?: string } | undefined
 
-  const transactions = family?.transactions || await prisma.transaction.findMany({
-    include: { member: true, category: true },
-    orderBy: { date: 'desc' },
-  })
+  // Redireciona se não autenticado ou sem workspace provisionado
+  if (!user?.familyId) {
+    redirect('/login')
+  }
 
-  const members = family?.members || await prisma.member.findMany()
+  const familyId = user.familyId
+
+  const [family, transactions, members] = await Promise.all([
+    prisma.family.findUnique({ where: { id: familyId } }),
+    prisma.transaction.findMany({
+      where:   { familyId },
+      include: { member: true, category: true },
+      orderBy: { date: 'desc' },
+    }),
+    prisma.member.findMany({
+      where:   { familyId },
+      orderBy: { createdAt: 'asc' },
+    }),
+  ])
 
   // Totais
   const totalIncomes = transactions
@@ -102,7 +111,7 @@ export default async function Dashboard() {
             <PiggyBank className="h-4 w-4 text-blue-500" />
           </CardHeader>
           <CardContent>
-            <div className={`text-xl sm:text-2xl font-bold ${balance >= 0 ? "text-blue-400" : "text-amber-500"}`}>
+            <div className={`text-xl sm:text-2xl font-bold ${balance >= 0 ? 'text-blue-400' : 'text-amber-500'}`}>
               R$ {balance.toFixed(2)}
             </div>
             <p className="text-[11px] text-muted-foreground mt-1">
@@ -135,11 +144,11 @@ export default async function Dashboard() {
             const memberIncomes = transactions
               .filter(t => t.memberId === member.id && t.type === TransactionType.INCOME && t.status === StatusType.PAID)
               .reduce((acc, curr) => acc + Number(curr.amount), 0)
-            
+
             const memberExpenses = transactions
               .filter(t => t.memberId === member.id && t.type === TransactionType.EXPENSE && t.status === StatusType.PAID)
               .reduce((acc, curr) => acc + Number(curr.amount), 0)
-            
+
             const memberBalance = memberIncomes - memberExpenses
 
             return (
@@ -167,7 +176,7 @@ export default async function Dashboard() {
                   </div>
                   <div className="flex justify-between font-bold pt-2 border-t border-border/80">
                     <span>Saldo Individual:</span>
-                    <span className={memberBalance >= 0 ? "text-emerald-400" : "text-red-400"}>
+                    <span className={memberBalance >= 0 ? 'text-emerald-400' : 'text-red-400'}>
                       R$ {memberBalance.toFixed(2)}
                     </span>
                   </div>
