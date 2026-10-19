@@ -41,9 +41,9 @@ export function ConfiguracoesClient({ initialUser, initialFamily, membersCount }
   const router = useRouter()
   const [userForm, setUserForm] = useState<UserData>({
     id: initialUser?.id || '',
-    name: initialUser?.name || 'Tiago',
-    email: initialUser?.email || 'tiago@financascasa.com',
-    phone: initialUser?.phone || '(11) 98765-4321',
+    name: initialUser?.name || 'Nome',
+    email: initialUser?.email || 'email@email.com',
+    phone: initialUser?.phone || '',
     currency: initialUser?.currency || 'BRL',
     timezone: initialUser?.timezone || 'America/Sao_Paulo',
     role: initialUser?.role || 'USER',
@@ -211,7 +211,7 @@ export function ConfiguracoesClient({ initialUser, initialFamily, membersCount }
                 <Label htmlFor="userPhone" className="text-xs">Telefone / WhatsApp</Label>
                 <Input
                   id="userPhone"
-                  placeholder="(11) 99999-9999"
+                  placeholder="(53) 99999-9999"
                   value={userForm.phone}
                   onChange={e => setUserForm({ ...userForm, phone: e.target.value })}
                 />
